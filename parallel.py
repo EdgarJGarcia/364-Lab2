@@ -1,45 +1,57 @@
-from multiprocessing import Manager, Process, Lock, Queue
+import threading
+import queue
 import time
 import random
 
-def worker(graph, task_queue, shared_distances, lock):
-    while True:
-        try:
-            current_distance, current_node = task_queue.get(timeout=0.1)
-        except:
-            return  # No more work
+import threading
+import queue
 
-        if current_distance > shared_distances[current_node]:
-            continue
+def parallel(graph, start_node, num_threads=6):
+    distances = {node: float('inf') for node in graph}
+    distances[start_node] = 0
 
-        for neighbor, weight in graph[current_node].items():
-            distance = current_distance + weight
-            with lock:
-                if distance < shared_distances[neighbor]:
-                    shared_distances[neighbor] = distance
-                    task_queue.put((distance, neighbor))
+    pq = queue.PriorityQueue()
+    pq.put((0, start_node))
 
-def parallel_dijkstra(graph, start_node, num_processes):
-    start_time = time.perf_counter()
+    node_locks = {node: threading.Lock() for node in graph}
 
-    manager = Manager()
-    lock = manager.Lock()
-    shared_distances = manager.dict({node: float('inf') for node in graph})
-    shared_distances[start_node] = 0
-    task_queue = manager.Queue()
-    task_queue.put((0, start_node))
+    def worker():
+        while True:
+            dist_u, u = pq.get()
+            if u is None:  # sentinel to stop
+                pq.task_done()
+                break
 
-    processes = []
-    for _ in range(num_processes):
-        p = Process(target=worker, args=(graph, task_queue, shared_distances, lock))
-        processes.append(p)
-        p.start()
+            if dist_u > distances[u]:
+                pq.task_done()
+                continue
 
-    for p in processes:
-        p.join()
+            for v, w in graph[u].items():
+                new_dist = dist_u + w
+                if new_dist < distances[v]:
+                    with node_locks[v]:
+                        if new_dist < distances[v]:
+                            distances[v] = new_dist
+                            pq.put((new_dist, v))
 
-    elapsed = time.perf_counter() - start_time
-    return dict(shared_distances), elapsed
+            pq.task_done()
+
+    threads = []
+    for _ in range(num_threads):
+        t = threading.Thread(target=worker)
+        t.start()
+        threads.append(t)
+
+    pq.join()
+
+    # Send sentinel None tasks to stop workers
+    for _ in range(num_threads):
+        pq.put((float('inf'), None))
+
+    for t in threads:
+        t.join()
+
+    return distances
 
 def generate_random_graph(num_nodes, avg_degree=4, max_weight=10):
     """
@@ -67,44 +79,11 @@ def generate_random_graph(num_nodes, avg_degree=4, max_weight=10):
 
     return graph
 
-if __name__ == '__main__':
-    # Example graph
-    graph2 = {
-        'A': {'B': 1, 'P': 4, 'V': 7},
-        'B': {'A': 1, 'R': 4, 'C': 3, 'E': 7, 'L': 9, 'D': 8, 'Q': 5},
-        'C': {'B': 3, 'F': 4, 'K': 3},
-        'D': {'B': 8, 'M': 6},
-        'E': {'B': 7, 'L': 3, 'H': 3},
-        'F': {'C': 4, 'J': 7, 'G': 9},
-        'G': {'F': 9, 'J': 5, 'H': 4, 'I': 3},
-        'H': {'E': 3, 'G': 5, 'O': 6},
-        'I': {'G': 3, 'P': 5},
-        'J': {'G': 5, 'T': 1, 'U': 8, 'F': 7},
-        'K': {'C': 3, 'S': 2},
-        'L': {'E': 3, 'B': 9, 'M': 5, 'N': 2},
-        'M': {'D': 6, 'L': 5},
-        'N': {'L': 2},
-        'O': {'H': 6},
-        'P': {'I': 5, 'U': 6, 'A': 4},
-        'Q': {'B': 5},
-        'R': {'B': 4},
-        'S': {'K': 2, 'T': 1},
-        'T': {'S': 1, 'J': 1, 'U': 11},
-        'U': {'T': 11, 'J': 8, 'P': 6},
-        'V': {'A': 7}
-    }
-
-    """
-    distances, elapsed = parallel_dijkstra(graph2, 'A', 4)
-    print("Distances:", distances)
-    print("Time:", elapsed)
-    """
-
-    # Parallel is slower than sequential...waiting for Professor's input 
-    
-    graph = generate_random_graph(50000, avg_degree=6)
+if __name__ == "__main__":
+    graph = generate_random_graph(100000, avg_degree=6)
     start_node = "0"
-
-    distances, elapsed = parallel_dijkstra(graph, '0', 4)
-    #print("Distances:", distances)
-    print("Time:", elapsed)
+    start_time = time.perf_counter()
+    shortest_paths = parallel(graph, start_node)
+    end_time = time.perf_counter()
+    #print(f"Shortest paths from {start_node}: {shortest_paths}") 
+    print("Compute time:", end_time - start_time)

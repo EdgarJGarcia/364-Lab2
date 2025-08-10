@@ -4,9 +4,8 @@ import random
 
 def sequential(graph, start_node):
     # Dijkstra's algorithm
-    start_time = time.perf_counter()
     distances = {node: float('inf') for node in graph} 
-    distances[start_node] = 0  
+    distances[start_node] = 0 
 
     priority_queue = [(0, start_node)]  
     while priority_queue:
@@ -21,9 +20,7 @@ def sequential(graph, start_node):
                 distances[neighbor] = distance
                 heapq.heappush(priority_queue, (distance, neighbor))
 
-    end_time = time.perf_counter()
-    elapsed_time = end_time - start_time
-    return distances, elapsed_time  
+    return distances
 
 def generate_random_graph(num_nodes, avg_degree=4, max_weight=10):
     """
@@ -52,6 +49,7 @@ def generate_random_graph(num_nodes, avg_degree=4, max_weight=10):
     return graph
 
 if __name__ == '__main__': 
+    # To run: python3 sequential.py
     graph = {
         'A': {'B': 1, 'C': 4},
         'B': {'A': 1, 'C': 2, 'D': 5},
@@ -81,19 +79,24 @@ if __name__ == '__main__':
         'S': {'K': 2, 'T': 1},
         'T': {'S': 1, 'J': 1, 'U': 11},
         'U': {'T': 11, 'J': 8, 'P': 6},
-        'V': {'A': 7}
+        'V': {'A': 7},
+        'Z' : {}
     }
 
     """
     start_node = 'A'
-    shortest_paths, shortest_paths_time = sequential(graph2, start_node)
+    start_time = time.perf_counter()
+    shortest_paths = sequential(graph, start_node)
+    end_time = time.perf_counter()
     print(f"Shortest paths from {start_node}: {shortest_paths}") 
-    print("Time:", shortest_paths_time)
+    print("Compute time:", end_time - start_time)
     """
 
-    graph = generate_random_graph(50000, avg_degree=6)
+    graph = generate_random_graph(5000000, avg_degree=6)
     start_node = "0"
+    start_time = time.perf_counter()
+    shortest_paths = sequential(graph, start_node)
+    end_time = time.perf_counter()
+    #print(f"Shortest paths from {start_node}: {shortest_paths}") 
+    print("Compute time:", end_time - start_time)
 
-    distances, elapsed = sequential(graph, start_node)
-    #print("Distances:", distances)
-    print("Time:", elapsed)
