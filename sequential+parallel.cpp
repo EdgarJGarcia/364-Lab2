@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
     cin.tie(nullptr);
 
     // Args: n avg_degree threads start max_weight seed
-    int n           = (argc > 1) ? atoi(argv[1]) : 100000;
+    int n           = (argc > 1) ? atoi(argv[1]) : 1000;
     int avg_degree  = (argc > 2) ? atoi(argv[2]) : 8;
     int threads     = (argc > 3) ? atoi(argv[3]) : 8;
     int start       = (argc > 4) ? atoi(argv[4]) : 0;
@@ -228,8 +228,13 @@ int main(int argc, char** argv) {
          << " max_weight=" << max_weight << "\n";
 
     auto edges = generate_random_graph(n, avg_degree, max_weight, seed);
-
-    /*n = 4;            // A=0, B=1, C=2, D=3
+    cout << "Generated " << edges.size() << " directed edges:\n";
+    for (const auto &e : edges) {
+        cout << e.from << " -> " << e.to << " (weight=" << e.weight << ")\n";
+    }
+    
+    /*
+    n = 4;            // A=0, B=1, C=2, D=3
     start = 0;        // source = A
     vector<Edge> edges = {
         {0,1,1}, {1,0,1},   // A<->B (1)
@@ -249,7 +254,7 @@ int main(int argc, char** argv) {
     double secs_djk = chrono::duration<double>(td2 - td1).count();
     cout << fixed << setprecision(6);
     cout << "Sequential Dijkstra:      " << secs_djk << " s\n";
-    //print_dist(dist_djk, "Output:");
+    print_dist(dist_djk, "Output:");
 
     // Sequential Bellman-Ford
     auto t1 = chrono::high_resolution_clock::now();
@@ -257,7 +262,7 @@ int main(int argc, char** argv) {
     auto t2 = chrono::high_resolution_clock::now();
     double secs_seq = chrono::duration<double>(t2 - t1).count();
     cout << "Sequential Bellman-Ford:  " << secs_seq << " s\n";
-    //print_dist(dist_seq, "Output:");
+    print_dist(dist_seq, "Output:");
 
     // Parallel Bellman-Ford
     auto t3 = chrono::high_resolution_clock::now();
@@ -265,7 +270,7 @@ int main(int argc, char** argv) {
     auto t4 = chrono::high_resolution_clock::now();
     double secs_par = chrono::duration<double>(t4 - t3).count();
     cout << "Parallel Bellman-Ford  (" << threads << " threads): " << secs_par << " s\n";
-    //print_dist(dist_par, "Output:");
+    print_dist(dist_par, "Output:");
 
     // Verify correctness
     size_t mism_djk_seq = 0, mism_seq_par = 0, mism_djk_par = 0;
