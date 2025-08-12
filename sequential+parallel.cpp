@@ -1,4 +1,3 @@
-// sssp_bf.cpp
 #include <iostream>
 #include <vector>
 #include <unordered_set>
@@ -9,8 +8,8 @@
 #include <algorithm>
 #include <atomic>
 #include <iomanip>
-#include <queue>        // <-- for priority_queue
-#include <functional>   // <-- for greater<>
+#include <queue>        
+#include <functional>   
 
 using namespace std;
 
@@ -38,6 +37,31 @@ vector<long long> bellman_ford_sequential(int n, const vector<Edge>& edges, int 
             }
         }
         if (!updated) break; // early exit
+    }
+    return dist;
+}
+
+// -----------------------------
+// Sequential Dijkstra (binary heap). Requires non-negative weights.
+// -----------------------------
+vector<long long> dijkstra_sequential(int n, const vector<vector<pair<int,int>>>& adj, int start) {
+    vector<long long> dist(n, INF);
+    dist[start] = 0;
+
+    using P = pair<long long,int>; // (dist, node)
+    priority_queue<P, vector<P>, greater<P>> pq;
+    pq.push({0, start});
+
+    while (!pq.empty()) {
+        auto [d, u] = pq.top(); pq.pop();
+        if (d != dist[u]) continue;
+        for (auto [v, w] : adj[u]) {
+            long long nd = d + (long long)w;
+            if (nd < dist[v]) {
+                dist[v] = nd;
+                pq.push({nd, v});
+            }
+        }
     }
     return dist;
 }
@@ -170,29 +194,15 @@ static inline vector<vector<pair<int,int>>> build_adj(int n, const vector<Edge>&
     return adj;
 }
 
-// Sequential Dijkstra (binary heap). Requires non-negative weights.
-vector<long long> dijkstra_sequential(int n,
-                                      const vector<vector<pair<int,int>>>& adj,
-                                      int start) {
-    vector<long long> dist(n, INF);
-    dist[start] = 0;
-
-    using P = pair<long long,int>; // (dist, node)
-    priority_queue<P, vector<P>, greater<P>> pq;
-    pq.push({0, start});
-
-    while (!pq.empty()) {
-        auto [d, u] = pq.top(); pq.pop();
-        if (d != dist[u]) continue;
-        for (auto [v, w] : adj[u]) {
-            long long nd = d + (long long)w;
-            if (nd < dist[v]) {
-                dist[v] = nd;
-                pq.push({nd, v});
-            }
-        }
+// Output: print the distances 
+static void print_dist(const vector<long long>& d, const char* label) {
+    cout << label << ": [";
+    for (size_t i = 0; i < d.size(); ++i) {
+        if (i) cout << ", ";
+        if (d[i] >= INF/2) cout << "INF";   // unreachable
+        else cout << d[i];
     }
-    return dist;
+    cout << "]\n";
 }
 
 // -----------------------------
@@ -203,7 +213,7 @@ int main(int argc, char** argv) {
     cin.tie(nullptr);
 
     // Args: n avg_degree threads start max_weight seed
-    int n           = (argc > 1) ? atoi(argv[1]) : 5000000;
+    int n           = (argc > 1) ? atoi(argv[1]) : 100000;
     int avg_degree  = (argc > 2) ? atoi(argv[2]) : 8;
     int threads     = (argc > 3) ? atoi(argv[3]) : 8;
     int start       = (argc > 4) ? atoi(argv[4]) : 0;
@@ -211,15 +221,23 @@ int main(int argc, char** argv) {
     uint32_t seed   = (argc > 6) ? (uint32_t)strtoul(argv[6], nullptr, 10) : 42u;
 
     cout << "Generating random graph...\n";
-    cout << "  nodes=" << n
+    cout << "nodes=" << n
          << " avg_degree=" << avg_degree
-         << " (undirected), threads=" << threads
+         << " threads=" << threads
          << " start=" << start
-         << " max_weight=" << max_weight
-         << " seed=" << seed << "\n";
+         << " max_weight=" << max_weight << "\n";
 
     auto edges = generate_random_graph(n, avg_degree, max_weight, seed);
-    cout << "  directed edges: " << edges.size() << "\n\n";
+
+    /*n = 4;            // A=0, B=1, C=2, D=3
+    start = 0;        // source = A
+    vector<Edge> edges = {
+        {0,1,1}, {1,0,1},   // A<->B (1)
+        {0,2,4}, {2,0,4},   // A<->C (4)
+        {1,2,2}, {2,1,2},   // B<->C (2)
+        {1,3,5}, {3,1,5},   // B<->D (5)
+        {2,3,1}, {3,2,1}    // C<->D (1)
+    };*/
 
     // Build adjacency for Dijkstra
     auto adj = build_adj(n, edges);
@@ -231,20 +249,23 @@ int main(int argc, char** argv) {
     double secs_djk = chrono::duration<double>(td2 - td1).count();
     cout << fixed << setprecision(6);
     cout << "Sequential Dijkstra:      " << secs_djk << " s\n";
+    //print_dist(dist_djk, "Output:");
 
-    // Sequential BF
+    // Sequential Bellman-Ford
     auto t1 = chrono::high_resolution_clock::now();
     auto dist_seq = bellman_ford_sequential(n, edges, start);
     auto t2 = chrono::high_resolution_clock::now();
     double secs_seq = chrono::duration<double>(t2 - t1).count();
     cout << "Sequential Bellman-Ford:  " << secs_seq << " s\n";
+    //print_dist(dist_seq, "Output:");
 
-    // Parallel BF
+    // Parallel Bellman-Ford
     auto t3 = chrono::high_resolution_clock::now();
     auto dist_par = bellman_ford_parallel(n, edges, start, threads);
     auto t4 = chrono::high_resolution_clock::now();
     double secs_par = chrono::duration<double>(t4 - t3).count();
     cout << "Parallel Bellman-Ford  (" << threads << " threads): " << secs_par << " s\n";
+    //print_dist(dist_par, "Output:");
 
     // Verify correctness
     size_t mism_djk_seq = 0, mism_seq_par = 0, mism_djk_par = 0;
